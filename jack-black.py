@@ -88,14 +88,29 @@ def draw_chip(value, x, y):
 def betting_phase(balance):
     bet = 0
     betting = True
+    bet_buttons = [
+        (1, WHITE), (5, RED), (10, BLUE), (25, NEON_GREEN),
+        (100, BLACK), (1000, YELLOW), (10000, NEON_GREEN)
+    ]
+    button_width = 100
+    button_height = 40
+    button_margin = 10
+    total_width = len(bet_buttons) * (button_width + button_margin) - button_margin
+    start_x = (WIDTH - total_width) // 2
+
     while betting:
         SCREEN.fill(GREEN)
         display_text(f"Your balance: ${balance}", 50, 50)
         display_text(f"Current bet: ${bet}", 50, 100)
-        display_text("Click on chips to add to your bet. Press SPACE to confirm.", 50, HEIGHT - 50)
-        for i, (value, (color, _)) in enumerate(chips.items()):
-            draw_chip(value, 100 + i * 100, HEIGHT - 100)
-        draw_button("Reset Bet", WIDTH - 200, HEIGHT - 100, 150, 40, YELLOW, BLACK)
+        display_text("Click on buttons to add to your bet. Press SPACE to confirm.", 50, HEIGHT - 100)
+
+        # Draw all bet buttons in a row at the bottom left
+        for i, (value, color) in enumerate(bet_buttons):
+            x = start_x + i * (button_width + button_margin)
+            draw_button(f"${value}", x, HEIGHT - 60, button_width, button_height, color, WHITE if color != WHITE else BLACK)
+
+        # Draw the reset button on the right side
+        draw_button("Reset Bet", WIDTH - 150, HEIGHT - 60, 130, 40, RED, WHITE)
         pygame.display.flip()
 
         for event in pygame.event.get():
@@ -103,12 +118,14 @@ def betting_phase(balance):
                 return None
             if event.type == pygame.MOUSEBUTTONDOWN:
                 mouse_pos = pygame.mouse.get_pos()
-                for i, value in enumerate(chips.keys()):
-                    if ((mouse_pos[0] - (100 + i * 100)) ** 2 + (mouse_pos[1] - (HEIGHT - 100)) ** 2) <= 400:
-                        if bet + value <= balance:
-                            bet += value
-                if WIDTH - 200 <= mouse_pos[0] <= WIDTH - 50 and HEIGHT - 100 <= mouse_pos[1] <= HEIGHT - 60:
-                    bet = 0
+                if HEIGHT - 60 <= mouse_pos[1] <= HEIGHT - 20:
+                    for i, (value, _) in enumerate(bet_buttons):
+                        x = start_x + i * (button_width + button_margin)
+                        if x <= mouse_pos[0] <= x + button_width:
+                            if bet + value <= balance:
+                                bet += value
+                    if WIDTH - 150 <= mouse_pos[0] <= WIDTH - 20:
+                        bet = 0
             if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE and bet > 0:
                 betting = False
     return bet
@@ -204,26 +221,19 @@ def play_game(balance):
               ("AI Player 2", ai2_score)]
     non_busted = [(name, score) for name, score in scores if score <= 21]
 
-    if non_busted:
-        max_score = max(score for _, score in non_busted)
-        winners = [name for name, score in non_busted if score == max_score]
-        
-        if player_score == dealer_score:
-            display_text("It's a tie! Your bet is returned.", WIDTH // 2 - 150, HEIGHT // 2)
-            # No change to balance, bet is implicitly returned
-        elif "You" in winners:
-            winnings = int(bet * 1.5)  # 3/2 of the bet
-            balance += winnings
-            display_text(f"Congrats! You win ${winnings}!", WIDTH // 2 - 150, HEIGHT // 2)
-        elif "Dealer" in winners:
-            balance -= bet
-            display_text(f"Dealer wins. You lose ${bet}.", WIDTH // 2 - 100, HEIGHT // 2)
-        else:
-            balance -= bet
-            winners_text = " and ".join(winners)
-            display_text(f"{winners_text} win. You lose ${bet}.", WIDTH // 2 - 150, HEIGHT // 2)
+    if player_score == dealer_score:
+        display_text("It's a tie! Your bet is returned.", WIDTH // 2 - 150, HEIGHT // 2)
+        # No change to balance, bet is implicitly returned
+    elif player_score > 21:
+        balance -= bet
+        display_text(f"You busted. You lose ${bet}.", WIDTH // 2 - 100, HEIGHT // 2)
+    elif dealer_score > 21 or player_score > dealer_score:
+        winnings = int(bet * 1.5)  # 3/2 of the bet
+        balance += winnings
+        display_text(f"Congrats! You win ${winnings}!", WIDTH // 2 - 150, HEIGHT // 2)
     else:
-        display_text("Everyone busted!", WIDTH // 2 - 70, HEIGHT // 2)
+        balance -= bet
+        display_text(f"Dealer wins. You lose ${bet}.", WIDTH // 2 - 100, HEIGHT // 2)
 
     # Display all final hands and scores
     SCREEN.fill(GREEN)
@@ -242,7 +252,7 @@ def play_game(balance):
     return balance
 
 # Main game loop
-balance = 1000
+balance = 10000
 while balance > 0:
     new_balance = play_game(balance)
     if new_balance is None:
