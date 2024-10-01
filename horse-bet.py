@@ -55,8 +55,11 @@ def draw_text(text, font, color, x, y):
     text_rect.topleft = (x, y)
     screen.blit(text_surface, text_rect)
 
+# Add this at the top of your file
+net_result = 0  # Global variable to track net result
+
 def betting_screen():
-    global INITIAL_BALANCE
+    global INITIAL_BALANCE, net_result
     selected_horse = None
     bet_amount = 0
     bet_buttons = [5, 10, 25, 100, 1000, 10000]
@@ -69,6 +72,7 @@ def betting_screen():
         screen.fill(WHITE)
         draw_text("Horse Betting", large_font, BLACK, 300, 50)
         draw_text(f"Balance: ${INITIAL_BALANCE}", font, BLACK, 550, 50)
+        draw_text(f"Net Result: ${net_result}", font, BLACK, 550, 90)  # Display net result
         draw_text(f"Current bet: ${bet_amount}", font, BLACK, 50, 100)
 
         # Calculate the starting y-position for bet buttons
@@ -117,7 +121,7 @@ def betting_screen():
                 # Place bet button
                 if WIDTH - 200 <= mouse_pos[0] <= WIDTH - 20 and HEIGHT - 100 <= mouse_pos[1] <= HEIGHT - 60:
                     if selected_horse is not None and bet_amount > 0:
-                        return selected_horse, bet_amount
+                        return selected_horse, bet_amount  # Return selected horse and bet amount
                 # Reset bet button
                 if WIDTH - 200 <= mouse_pos[0] <= WIDTH - 20 and HEIGHT - 150 <= mouse_pos[1] <= HEIGHT - 110:
                     bet_amount = 0
@@ -186,6 +190,9 @@ def race_screen(selected_horse, bet_amount):
             if len(race_results) == len(horses):
                 racing = False
 
+        # Define winning_horse after the race is finished
+        winning_horse = race_results[0][0] if race_results else None  # Get the first horse in race_results
+
         # Display final positions for a moment
         for _ in range(40):  # Show final positions for about 2 seconds
             draw_race(horse_positions, finish_line_x, race_results)
@@ -197,7 +204,7 @@ def race_screen(selected_horse, bet_amount):
         pygame.display.flip()
         pygame.time.delay(2000)  # Wait for 2 seconds before showing results
 
-        return race_results, selected_horse, bet_amount
+        return race_results, selected_horse, bet_amount, winning_horse  # Return winning_horse
 
 def draw_race(horse_positions, finish_line_x, race_results):
     # Define colors for positions
@@ -235,8 +242,8 @@ def draw_race(horse_positions, finish_line_x, race_results):
     
     pygame.display.flip()
 
-def results_screen(race_results, selected_horse, bet_amount):
-    global INITIAL_BALANCE
+def results_screen(race_results, selected_horse, bet_amount, winning_horse):
+    global INITIAL_BALANCE, net_result
     original_balance = INITIAL_BALANCE  # Store the original balance before the bet
 
     while True:
@@ -299,14 +306,15 @@ def results_screen(race_results, selected_horse, bet_amount):
 
         # Draw result message and update balance
         selected_horse_name = horses[selected_horse]
-        winning_horse = race_results[0][0]  # The first horse in race_results is the winner
         
         if selected_horse_name == winning_horse:  # Player's horse won
             winnings = bet_amount * odds[selected_horse]
             INITIAL_BALANCE = original_balance + winnings  # Add winnings to original balance
+            net_result += winnings  # Update net result by adding winnings
             result_text = large_font.render(f"You Won ${winnings}!", True, GOLD)
         else:
             INITIAL_BALANCE = original_balance - bet_amount  # Subtract the bet amount once
+            net_result -= bet_amount  # Update net result by subtracting the bet amount
             result_text = large_font.render(f"You Lost ${bet_amount}.", True, BLACK)
             selected_horse_position = next((i for i, (h, _) in enumerate(race_results) if h == selected_horse_name), -1)
             position_text = font.render(f"Your horse finished in {selected_horse_position + 1}{'st' if selected_horse_position == 0 else 'nd' if selected_horse_position == 1 else 'rd' if selected_horse_position == 2 else 'th'} place.", True, BLACK)
@@ -314,8 +322,9 @@ def results_screen(race_results, selected_horse, bet_amount):
         
         screen.blit(result_text, (WIDTH // 2 - result_text.get_width() // 2, 100))
 
-        # Display updated balance
-        balance_text = font.render(f"New Balance: ${INITIAL_BALANCE}", True, BLACK)
+        # Display net result
+        net_result_text = f"Net Result: ${net_result}"  # Format net result text
+        balance_text = font.render(net_result_text, True, BLACK)
         screen.blit(balance_text, (WIDTH // 2 - balance_text.get_width() // 2, 150))
 
         # Add larger button to return to main menu
@@ -334,13 +343,17 @@ def results_screen(race_results, selected_horse, bet_amount):
                 if WIDTH // 2 - button_width // 2 <= event.pos[0] <= WIDTH // 2 + button_width // 2 and HEIGHT - 280 <= event.pos[1] <= HEIGHT - 280 + button_height:
                     return  # Return to main menu
 
+        # Break the loop after displaying results
+        pygame.display.flip()
+        pygame.time.delay(2000)  # Pause to show results
+        break  # Exit the results screen loop
+
 def main():
-    global INITIAL_BALANCE
+    global INITIAL_BALANCE, net_result
     while True:
         selected_horse, bet_amount = betting_screen()
-        race_results, selected_horse, bet_amount = race_screen(selected_horse, bet_amount)
-        results_screen(race_results, selected_horse, bet_amount)
-        # The game will return here after the results screen, ready for the next bet
+        race_results, selected_horse, bet_amount, winning_horse = race_screen(selected_horse, bet_amount)  # Capture winning_horse
+        results_screen(race_results, selected_horse, bet_amount, winning_horse)  # Pass winning_horse to results_screen
 
 if __name__ == "__main__":
     main()
