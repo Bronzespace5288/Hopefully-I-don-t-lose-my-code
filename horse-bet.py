@@ -133,7 +133,9 @@ def race_screen(selected_horse, bet_amount):
     horse_positions = {horse: 0 for horse in horses}
     race_results = []
     finish_line_x = WIDTH - 100  # Position of the finish line
-    
+    lane_height = 80  # Height of each lane
+    num_horses = len(horses)
+
     # Create checkered pattern for finish line
     checker_size = 20
     checker_pattern = pygame.Surface((checker_size * 2, HEIGHT))
@@ -142,19 +144,35 @@ def race_screen(selected_horse, bet_amount):
         pygame.draw.rect(checker_pattern, BLACK, (0, y, checker_size, checker_size))
         pygame.draw.rect(checker_pattern, BLACK, (checker_size, y + checker_size, checker_size, checker_size))
 
-    # Player's bet info box
-    info_box_width = 280  # Increased from 250 to 280
-    info_box_height = 120
-    info_box_x = 10
-    info_box_y = HEIGHT - info_box_height - 10
-    text_bg_color = (200, 200, 200)  # Light grey
-
     while True:
-        screen.fill(WHITE)
+        screen.fill((139, 0, 0))  # Dark red background
+
+        # Draw white stripes for the racetrack
+        for i in range(num_horses + 1):
+            pygame.draw.rect(screen, WHITE, (0, i * lane_height, WIDTH, 5))  # Draw a white stripe for each lane
+
         draw_text("Horse Race", large_font, BLACK, 300, 50)
 
-        # Draw finish line
-        screen.blit(checker_pattern, (finish_line_x, 0))
+        # Draw the betting information box in the bottom left corner
+        box_width = 250
+        box_height = 100
+        box_x = 20  # Position from the left
+        box_y = HEIGHT - box_height - 20  # Position from the bottom
+
+        # Draw the white box
+        pygame.draw.rect(screen, WHITE, (box_x, box_y, box_width, box_height))
+        pygame.draw.rect(screen, BLACK, (box_x, box_y, box_width, box_height), 2)  # Border
+
+        # Display the horse image
+        horse_image = horse_images[horses[selected_horse]]  # Get the image of the selected horse
+        horse_image = pygame.transform.scale(horse_image, (60, 60))  # Resize image
+        screen.blit(horse_image, (box_x + 10, box_y + 10))
+
+        # Display the horse name and bet amount
+        horse_name_text = font.render(horses[selected_horse], True, BLACK)
+        bet_amount_text = font.render(f"Bet: ${bet_amount}", True, BLACK)
+        screen.blit(horse_name_text, (box_x + 80, box_y + 15))
+        screen.blit(bet_amount_text, (box_x + 80, box_y + 45))
 
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -168,24 +186,11 @@ def race_screen(selected_horse, bet_amount):
                     horse_positions[horse] += random.randint(1, 10)
                     if horse_positions[horse] >= finish_line_x:
                         race_results.append((horse, odds[horses.index(horse)]))
-            draw_race(horse_positions, finish_line_x, race_results)
-            
-            # Draw player's bet info box
-            pygame.draw.rect(screen, GRAY, (info_box_x, info_box_y, info_box_width, info_box_height))
-            selected_horse_name = horses[selected_horse]
-            screen.blit(horse_images[selected_horse_name], (info_box_x + 10, info_box_y + 10))
-            
-            # Draw text backgrounds
-            pygame.draw.rect(screen, text_bg_color, (info_box_x + 100, info_box_y + 20, 170, 30))  # Increased width from 140 to 170
-            pygame.draw.rect(screen, text_bg_color, (info_box_x + 100, info_box_y + 60, 170, 30))  # Increased width from 140 to 170
-            
-            # Draw text
-            draw_text(f"Bet: {selected_horse_name}", font, BLACK, info_box_x + 105, info_box_y + 25)
-            draw_text(f"Amount: ${bet_amount}", font, BLACK, info_box_x + 105, info_box_y + 65)
+            draw_race(horse_positions, finish_line_x, race_results, lane_height)  # Pass lane_height to draw_race
             
             pygame.display.flip()
             pygame.time.delay(50)
-            
+
             # Continue racing until all horses have finished
             if len(race_results) == len(horses):
                 racing = False
@@ -195,7 +200,7 @@ def race_screen(selected_horse, bet_amount):
 
         # Display final positions for a moment
         for _ in range(40):  # Show final positions for about 2 seconds
-            draw_race(horse_positions, finish_line_x, race_results)
+            draw_race(horse_positions, finish_line_x, race_results, lane_height)
             pygame.display.flip()
             pygame.time.delay(50)
 
@@ -206,7 +211,7 @@ def race_screen(selected_horse, bet_amount):
 
         return race_results, selected_horse, bet_amount, winning_horse  # Return winning_horse
 
-def draw_race(horse_positions, finish_line_x, race_results):
+def draw_race(horse_positions, finish_line_x, race_results, lane_height):
     # Define colors for positions
     position_colors = {
         0: GOLD,    # 1st place
@@ -221,7 +226,7 @@ def draw_race(horse_positions, finish_line_x, race_results):
     ))
 
     for i, horse in enumerate(sorted_horses):
-        y = 100 + i * 80  # Position based on current rank
+        y = (i * lane_height) + 100  # Position based on current rank, with an offset for the title
         x = min(horse_positions[horse], finish_line_x)  # Ensure horse doesn't go past finish line
         screen.blit(horse_images[horse], (x, y))
 
@@ -243,7 +248,7 @@ def draw_race(horse_positions, finish_line_x, race_results):
     pygame.display.flip()
 
 def results_screen(race_results, selected_horse, bet_amount, winning_horse):
-    global INITIAL_BALANCE, net_result
+    global INITIAL_BALANCE, net_result  # Ensure net_result is recognized as global
     original_balance = INITIAL_BALANCE  # Store the original balance before the bet
 
     while True:
@@ -320,30 +325,19 @@ def results_screen(race_results, selected_horse, bet_amount, winning_horse):
             position_text = font.render(f"Your horse finished in {selected_horse_position + 1}{'st' if selected_horse_position == 0 else 'nd' if selected_horse_position == 1 else 'rd' if selected_horse_position == 2 else 'th'} place.", True, BLACK)
             screen.blit(position_text, (WIDTH // 2 - position_text.get_width() // 2, 200))
         
-        screen.blit(result_text, (WIDTH // 2 - result_text.get_width() // 2, 100))
+        # Debugging line
+        print(f"Current net_result: {net_result}")  # Check the value of net_result
 
         # Display net result
         net_result_text = f"Net Result: ${net_result}"  # Format net result text
         balance_text = font.render(net_result_text, True, BLACK)
         screen.blit(balance_text, (WIDTH // 2 - balance_text.get_width() // 2, 150))
 
-        # Add larger button to return to main menu
-        button_width = 250
-        button_height = 50
-        pygame.draw.rect(screen, GREEN, (WIDTH // 2 - button_width // 2, HEIGHT - 280, button_width, button_height))
-        draw_text("Return to Main Menu", font, BLACK, WIDTH // 2 - button_width // 2 + 10, HEIGHT - 275)
+        # Display the result message
+        screen.blit(result_text, (WIDTH // 2 - result_text.get_width() // 2, 100))
 
-        pygame.display.flip()
+        # No box for horse image, name, and bet amount on results screen
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-                sys.exit()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if WIDTH // 2 - button_width // 2 <= event.pos[0] <= WIDTH // 2 + button_width // 2 and HEIGHT - 280 <= event.pos[1] <= HEIGHT - 280 + button_height:
-                    return  # Return to main menu
-
-        # Break the loop after displaying results
         pygame.display.flip()
         pygame.time.delay(2000)  # Pause to show results
         break  # Exit the results screen loop
